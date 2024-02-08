@@ -1,7 +1,7 @@
 const express = require("express");
 const mongoose = require("mongoose");
-const bcrypt = require("bcryptjs");
-const jwt = require("jsonwebtoken");
+const bcrypt = require("bcryptjs");// للتشفير مكتبه
+const jwt = require("jsonwebtoken");// لحفظ بيانات المستخمدم  كوكيز
 const bodyParser = require("body-parser");
 const cors = require("cors");
 
@@ -9,6 +9,8 @@ const User = require("./models/User");
 const Order = require("./models/Order");
 const Service = require("./models/Service");
 const Message = require("./models//messages");
+const multer = require('multer');
+const path = require('path')
 
 const app = express();
 app.use(cors());
@@ -41,6 +43,55 @@ const authenticateToken = (req, res, next) => {
     next();
   });
 };
+
+// Set storage engine
+const storage = multer.diskStorage({
+  destination: './uploads/',
+  filename: function (req, file, cb) {
+    cb(null, file.fieldname + '-' + Date.now() + path.extname(file.originalname));
+  }
+});
+
+// Initialize upload
+const upload = multer({
+  storage: storage,
+  limits: { fileSize: 1000000 }, // 1MB
+  fileFilter: function (req, file, cb) {
+    checkFileType(file, cb);
+  }
+}).single('image');
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
+// Check file type
+function checkFileType(file, cb) {
+  // Allowed extensions
+  const filetypes = /jpeg|jpg|png|gif/;
+  // Check the extension
+  const extname = filetypes.test(path.extname(file.originalname).toLowerCase());
+  // Check the MIME type
+  const mimetype = filetypes.test(file.mimetype);
+  if (mimetype && extname) {
+    return cb(null, true);
+  } else {
+    cb('Error: Images only!');
+  }
+}
+
+// Upload endpoint
+app.post('/upload', (req, res) => {
+  upload(req, res, (err) => {
+    if (err) {
+      res.status(400).json({ message: err });
+    } else {
+      if (req.file == undefined) {
+        res.status(400).json({ message: 'Error: No File Selected!' });
+      } else {
+        const baseUrl = req.protocol + '://' + req.get('host');
+        res.status(200).json({ imageUrl: `https://general-be1-eeea8a48c7e4.herokuapp.com/uploads/${req.file.filename}` });
+      }
+    }
+  });
+});
 
 // User Registration
 app.post("/register", async (req, res) => {
